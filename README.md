@@ -14,6 +14,8 @@ Repositorio del curso de Maestría en **Procesamiento de Lenguaje Natural**. Re�
 - [Dataset](#dataset)
 - [Estructura del repositorio](#estructura-del-repositorio)
 - [Taller 1 — NER híbrido (spaCy + Bi-LSTM)](#taller-1--sistema-híbrido-de-reconocimiento-de-entidades-spacy--bi-lstm)
+- [Taller 2 — NER con Transformer encoder](#taller-2--ner-con-transformer-encoder)
+- [Taller 3 — NER con BERT preentrenado](#taller-3--ner-con-bert-preentrenado)
 - [Cómo ejecutar los cuadernos](#cómo-ejecutar-los-cuadernos)
 - [Licencia](#licencia)
 
@@ -37,7 +39,9 @@ Categorías anotadas: `CHEMICAL`, `DISEASE`, `PROCEDURE`, `PROTEIN`, `SYMPTOM`.
 ```
 NLP_taller_1/
 ├── README.md
-└── notebook_taller_1.ipynb   # Taller 1: NER híbrido spaCy + Bi-LSTM
+├── notebook_taller_1.ipynb   # Taller 1: NER híbrido spaCy + Bi-LSTM
+├── notebook_taller_2.ipynb   # Taller 2: NER con Transformer encoder desde cero
+└── notebook_taller_3.ipynb   # Taller 3: BERT preentrenado; etapa de descarga de datos
 ```
 
 Cada taller nuevo se documenta en una sección propia de este README y, cuando aplique, en su propio cuaderno (`notebook_taller_N.ipynb`) o carpeta, manteniendo el mismo dataset como base de comparación.
@@ -99,13 +103,35 @@ La variante con POS obtuvo mayor F1 en las tres semillas evaluadas, con una mejo
 - La comparación usa una única partición fija y tres semillas; la desviación estándar describe variabilidad de entrenamiento, no significancia estadística.
 - Las predicciones son un ejercicio académico y no sustituyen una decisión clínica.
 
+## Taller 2 — NER con Transformer encoder
+
+**Cuaderno:** [`notebook_taller_2.ipynb`](notebook_taller_2.ipynb).
+
+Sustituye la Bi-LSTM por un encoder implementado con PyTorch siguiendo el ejemplo de clase: posiciones sinusoidales, atención multicabeza, conexiones residuales y redes densas. Usa dos bloques, cuatro cabezas y dimensión interna 128; una capa lineal produce las 11 etiquetas BIO por token. Los embeddings se entrenan desde cero.
+
+Conserva el preprocesamiento, las particiones, las variantes con/sin POS y las tres semillas del taller 1. El PASO 10B compara automáticamente los nuevos resultados de validación con los valores exactos guardados del taller 1, verificando datos, partición y preprocesamiento. Se reportan diferencias de F1 por semilla y categoría, parámetros y tiempos. **Los resultados del Transformer están pendientes de ejecución en Kaggle.**
+
+Para ejecutarlo, importar el notebook en Kaggle, activar **Internet** y **GPU T4 ×2**, y ejecutar las celdas en orden. El lote global de 16 ejemplos se reparte entre ambas GPU. La prueba técnica comprueba atención, gradientes, padding y participación de los dispositivos antes de los seis entrenamientos.
+
+El test final está habilitado para la ejecución completa: selecciona la variante con mayor F1 medio de validación y usa la semilla 42, fijada antes de entrenar. Guarda `summary.json`, `comparison_transformer_vs_lstm_*.csv`, `informe_taller_2.md`, vocabulario, partición y checkpoints bajo `/kaggle/working/spaccc_transformer/`. No es necesario adjuntar el notebook del taller 1: la línea base está incluida con su procedencia.
+
+La comparación es descriptiva y los modelos tienen distinto número de parámetros. Mantiene las limitaciones de BIO plano y de la evaluación por bloques del taller 1; no garantiza una mejora por usar Transformer.
+
+## Taller 3 — NER con BERT preentrenado
+
+**Cuaderno:** [`notebook_taller_3.ipynb`](notebook_taller_3.ipynb).
+
+Desarrollo paso a paso a partir del ejemplo de clase `1_text_classification_with_hf.ipynb`. Usaremos BETO para clasificación por token sobre SPACCC. La versión actual incluye descarga y auditoría del corpus, inspección BIO con spaCy, partición fija de 600/150/250 documentos y análisis del tokenizador de BETO. El PASO 05 muestra longitudes, fragmentación, alineación al primer subtoken y diagnóstico de ventanas en entrenamiento y validación. Todavía no se construyen lotes ni se cargan pesos de BERT.
+
+Activar Internet en Kaggle y ejecutar las celdas en orden; esta primera etapa no requiere GPU. Los datos y la auditoría `data_summary.json` se guardan en `spaccc_bert/` (bajo `/kaggle/working/` en Kaggle).
+
 ## Cómo ejecutar los cuadernos
 
 1. Abrir el cuaderno correspondiente en un entorno con GPU e Internet habilitado:
    - **Kaggle** (entorno original, recomendado para reproducir los resultados reportados): acelerador **GPU T4 ×2**.
    - **Google Colab**: usa el botón *Abrir en Colab* de arriba, o el badge dentro del propio cuaderno. El plan gratuito de Colab entrega **una sola GPU T4**, así que antes de ejecutar el PASO 02 cambia `requested_gpus=1` (o `allow_cpu_for_debug=True` para depurar sin GPU); el cuaderno funciona igual, pero sin `DataParallel` y con tiempos de entrenamiento distintos a los reportados en el informe final.
 2. Ejecutar las celdas en orden desde el PASO 01; cada paso valida sus propias precondiciones y detiene la ejecución con un mensaje claro si algo falta.
-3. Los artefactos (checkpoints, métricas, `summary.json`, tablas `comparison_*.csv`) quedan guardados en una carpeta con marca de tiempo dentro de `spaccc_gpu/` (en Colab, típicamente bajo `/content/spaccc_gpu/`).
+3. Los artefactos (checkpoints, métricas, `summary.json`, tablas `comparison_*.csv`) quedan guardados en una carpeta con marca de tiempo dentro de `spaccc_gpu/` para el taller 1 o `spaccc_transformer/` para el taller 2, bajo `/kaggle/working/` en Kaggle.
 
 ## Licencia
 
