@@ -1,0 +1,89 @@
+# Taller 1:
+
+Objetivo y diseño
+Comparamos una Bi-LSTM bidireccional para reconocimiento de entidades clínicas con embeddings de palabras y dos configuraciones: con embeddings POS y sin embeddings POS. Obtuvimos el POS con spaCy; en ambas configuraciones usamos los mismos documentos, bloques, etiquetas, vocabulario, pesos de clase y protocolo de evaluación.
+
+Fijamos la partición por documento con split_seed=42: 600 documentos de entrenamiento, 150 de validación y 250 de test reservados. Ejecutamos las semillas de entrenamiento: [42, 123, 2026].
+
+Resultado de validación multisemilla
+Variante	F1 medio	Desv. estándar	Precisión media	Recall medio	Tiempo de entrenamiento medio
+con_pos	38.96 %	0.51 %	32.44 %	48.76 %	54.58 s
+sin_pos	37.13 %	1.30 %	30.90 %	46.53 %	54.33 s
+Semilla	F1 con POS	F1 sin POS	Diferencia (puntos)
+42	38.71 %	38.33 %	+0.38
+123	38.61 %	37.30 %	+1.31
+2026	39.54 %	35.75 %	+3.79
+
+
+# Taller 2:
+
+Objetivo y diseno
+Comparamos dos variantes de un Transformer encoder implementado desde cero (embeddings entrenados desde cero, sin pesos preentrenados): con_pos (embedding de palabra + embedding de POS de spaCy concatenado) y sin_pos (solo embedding de palabra) -- el mismo eje de comparacion de taller 1, aplicado ahora a un encoder Transformer en vez de una Bi-LSTM. Usamos la misma particion de documentos de taller 1 (split_seed=42, huella ab06b4e8... -- identica a la de taller 1 -- 600 documentos de entrenamiento, 150 de validacion, 250 de test) y las mismas tres semillas de entrenamiento (42, 123, 2026). La tokenizacion, alineacion BIO y vocabulario reutilizan literalmente el pipeline de taller 1 (spaCy + politica "flat-longest"), y las metricas usan la misma funcion entity_spans/scores_from_counts -- por eso la comparacion contra la Bi-LSTM (PASO 11B) es directa, no aproximada.
+
+Arquitectura: d_model=128, num_heads=4, layers=2, ff_dim=256, embeddings de palabra (embedding_dim=64) y POS (pos_dim=16), dropout=0.25, batch_size=16, learning_rate=0.001, hasta 20 epocas con parada temprana (patience=5), en 2 GPU Tesla T4 (DataParallel). con_pos tiene 1,575,947 parametros; sin_pos, 1,573,579 (la diferencia son los 2,368 parametros del embedding de POS y la capa de proyeccion de entrada).
+
+Calidad de la alineacion (PASO 06)
+Particion	Anotaciones	Sin alinear	Solapes excluidos	Retenidas
+Entrenamiento	26,849	197 (0.7 %)	4,251	22,401 (83.4 %)
+Validacion	6,908	57 (0.8 %)	990	5,861 (84.8 %)
+Identico a taller 1 (mismo pipeline de spaCy), como se esperaba.
+
+Resultado de validacion multisemilla
+Variante	F1 medio	Desv. estandar	Precision media	Recall medio
+con_pos	26.69 %	1.73 %	19.94 %	40.54 %
+sin_pos	24.98 %	2.26 %	18.21 %	40.14 %
+Semilla	F1 con_pos	F1 sin_pos	Diferencia
+42	24.76 %	22.59 %	+2.18 pp
+123	28.11 %	27.07 %	+1.04 pp
+2026	27.19 %	25.29 %	+1.91 pp
+
+
+Taller 3:
+
+Objetivo
+Resolvemos el mismo problema del taller 1 — reconocimiento de entidades clínicas (síntomas, enfermedades, procedimientos, fármacos y proteínas) sobre el corpus SPACCC en español — pero reemplazamos la arquitectura Bi-LSTM entrenada desde cero por transformers preentrenados, haciendo fine-tuning con la librería transformers de Hugging Face.
+
+comparison_runs
+checkpoint	variante	semilla	learning_rate	mejor_epoca	epocas_ejecutadas	pasos	precision_pct	recall_pct	f1_pct	train_segundos
+beto	frozen	123	0.001	8.0	8.0	480	31.922	47.739	38.261	215.146
+beto	fine_tuned	123	0.0	6.0	8.0	480	59.716	68.265	63.705	509.776
+clinical	frozen	123	0.001	8.0	8.0	424	29.284	42.45	34.659	195.842
+clinical	fine_tuned	123	0.0	8.0	8.0	424	58.194	68.708	63.015	459.055
+comparison_aggregate
+checkpoint	variante	n_semillas	precision_pct_media	precision_pct_std	recall_pct_media	recall_pct_std	f1_pct_media	f1_pct_std	train_segundos_media	train_segundos_std
+beto	frozen	1	31.922	No estimable	47.739	No estimable	38.261	No estimable	215.146	No estimable
+beto	fine_tuned	1	59.716	No estimable	68.265	No estimable	63.705	No estimable	509.776	No estimable
+clinical	frozen	1	29.284	No estimable	42.45	No estimable	34.659	No estimable	195.842	No estimable
+clinical	fine_tuned	1	58.194	No estimable	68.708	No estimable	63.015	No estimable	459.055	No estimable
+comparison_per_label_runs
+checkpoint	variante	semilla	categoria	entidades_validacion	precision_pct	recall_pct	f1_pct
+beto	frozen	123	CHEMICAL	577	74.121	80.416	77.14
+beto	frozen	123	DISEASE	1391	28.565	49.245	36.157
+beto	frozen	123	PROCEDURE	1906	37.337	51.049	43.129
+beto	frozen	123	PROTEIN	305	54.422	52.459	53.422
+beto	frozen	123	SYMPTOM	1682	18.163	30.678	22.817
+beto	fine_tuned	123	CHEMICAL	577	82.423	83.709	83.061
+beto	fine_tuned	123	DISEASE	1391	58.701	68.871	63.381
+beto	fine_tuned	123	PROCEDURE	1906	62.064	69.098	65.392
+beto	fine_tuned	123	PROTEIN	305	57.183	66.557	61.515
+beto	fine_tuned	123	SYMPTOM	1682	51.87	61.831	56.414
+clinical	frozen	123	CHEMICAL	577	69.618	69.497	69.558
+clinical	frozen	123	DISEASE	1391	28.739	45.723	35.294
+clinical	frozen	123	PROCEDURE	1906	33.294	44.753	38.183
+clinical	frozen	123	PROTEIN	305	51.813	32.787	40.161
+clinical	frozen	123	SYMPTOM	1682	16.87	29.608	21.493
+clinical	fine_tuned	123	CHEMICAL	577	67.113	78.163	72.218
+clinical	fine_tuned	123	DISEASE	1391	60.253	72.035	65.619
+clinical	fine_tuned	123	PROCEDURE	1906	60.95	70.672	65.452
+clinical	fine_tuned	123	PROTEIN	305	48.485	47.213	47.841
+clinical	fine_tuned	123	SYMPTOM	1682	52.117	64.388	57.606
+comparison_paired_checkpoint
+variante	semilla	f1_beto_pct	f1_clinical_pct	diferencia_pp
+frozen	123	38.261	34.659	-3.602
+fine_tuned	123	63.705	63.015	-0.69
+comparison_paired_variant
+checkpoint	semilla	diferencia_pp
+beto	123	25.444
+clinical	123	28.356
+
+
